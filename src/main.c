@@ -107,9 +107,29 @@ void runManagerProcess(int numProcesses, FILE* file, long long chunkSize) {
     long long fileSize = getFileSize(file); // Get file size in Bytes
     long long nextChunkOffset = 0;
 
+    // Post async message receives from workers
+
     while(nextChunkOffset < fileSize) {
+        long long nextChunkSize = chunkSize; // Initialize next chunk size as maximum
+
+        if(nextChunkOffset + chunkSize > fileSize) // Reduce chunk size if EOF will be exceeded
+            nextChunkSize = fileSize - nextChunkOffset;
+
+        // Respond to worker message with next file chunk
+
+        nextChunkOffset += chunkSize; // Update next chunk offset
+    }
+
+    int processesCompleted = 0; // Tracks processes finished reading
+
+    // Wait for all processes to complete
+    while(processesCompleted < numProcesses - 1) {
+        // Respond with EOF message
+
         
     }
+    
+
 }
 
 
@@ -127,16 +147,18 @@ int main(int argc, char* argv[]) {
     MPI_Barrier(MPI_COMM_WORLD); // Wait for processes
     elapsedTime = -MPI_Wtime(); // Start benchmark time
 
+    FILE* file = fopen(argv[1], "r"); // Attempt to open text file
+
+    if(!file) { // Error opening file
+        fprintf(stderr, ERR_MSG_FNO, argv[1], strerror(errno));
+        return ERR_CODE;
+    }
+
+    if(errCode )
+
     if(!id) {
         if(argc < 2) { // Filepath argument missing
             fprintf(stderr, ERR_MSG_ARGS, argv[0]);
-            return ERR_CODE;
-        }
-
-        FILE* file = fopen(argv[1], "r"); // Attempt to open text file
-
-        if(!file) { // Error opening file
-            fprintf(stderr, ERR_MSG_FNO, argv[1], strerror(errno));
             return ERR_CODE;
         }
 
