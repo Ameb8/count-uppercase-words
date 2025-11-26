@@ -28,6 +28,19 @@ typedef struct {
 } HashMap;
 
 
+// Public API
+void hashMapInit(HashMap *m);
+void hashMapPut(HashMap *m, const char *key, int value);
+int hashMapGet(HashMap *m, const char *key, int *outValue);
+void hashMapMap(HashMap *m, void (*fn)(const char *, int));
+void hashMapFree(HashMap *m);
+
+#endif // HASHMAP_H
+
+
+#ifdef HASHMAP_IMPLEMENTATION
+
+
 // djb2 hashing function
 static inline unsigned long hash(const char *str) {
     unsigned long hash = 5381; // Initial hash value
@@ -41,7 +54,7 @@ static inline unsigned long hash(const char *str) {
 
 
 // Initialize empty hashmap
-static inline void hashmapInit(HashMap *m) {
+static inline void hashMapInit(HashMap *m) {
     // Initialize all buckets to null
     for (int i = 0; i < HM_TABLE_SIZE; i++)
         m->buckets[i] = NULL;
@@ -51,7 +64,7 @@ static inline void hashmapInit(HashMap *m) {
 
 
 // Insert new value or update existing
-static inline void hashmapPut(HashMap *m, const char *key, int value) {
+static inline void hashMapPut(HashMap *m, const char *key, int value) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
@@ -77,7 +90,7 @@ static inline void hashmapPut(HashMap *m, const char *key, int value) {
 
 
 // Retrieve value associated with key in hashmap
-static inline int hashmapGet(HashMap *m, const char *key, int *outValue) {
+static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
@@ -95,7 +108,7 @@ static inline int hashmapGet(HashMap *m, const char *key, int *outValue) {
 
 
 
-static inline void hashmapMap(HashMap *m, void (*fn)(const char *, int)) {
+static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int)) {
     // Iterate through used buckets
     for(int i = 0; i < m->usedCount; i++) {
         int bucket = m->usedBuckets[i];
@@ -110,7 +123,7 @@ static inline void hashmapMap(HashMap *m, void (*fn)(const char *, int)) {
 
 
 // Deallocate hashmap memory
-static inline void hashmapFree(HashMap *m) {
+static inline void hashMapFree(HashMap *m) {
     // Iterate through used buckets
     for(int i = 0; i < m->usedCount; i++) {
         int bucket = m->usedBuckets[i];
@@ -126,4 +139,4 @@ static inline void hashmapFree(HashMap *m) {
 }
 
 
-#endif /* HASHMAP_H */
+#endif // HASHMAP_IMPLEMENTATION
