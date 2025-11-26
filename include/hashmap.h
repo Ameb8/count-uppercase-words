@@ -28,12 +28,24 @@ typedef struct {
 } HashMap;
 
 
-// Public API
+typedef struct {
+    HashMap *map; // Hashmap being iterated
+    int bucketIndex; // Current bucket
+    HashMapEntry *entry; // Current entry in the bucket
+} HashMapIterator;
+
+
+// Public HashMap API
 void hashMapInit(HashMap *m);
 void hashMapPut(HashMap *m, const char *key, int value);
+char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int));
 int hashMapGet(HashMap *m, const char *key, int *outValue);
 void hashMapMap(HashMap *m, void (*fn)(const char *, int));
 void hashMapFree(HashMap *m);
+
+// Public Iterator API
+void iteratorInit(HashMapIterator *it, HashMap *map);
+void iteratorNext(HashMapIterator *it, const char **key, int *value);
 
 #endif // HASHMAP_H
 
@@ -56,7 +68,7 @@ static inline unsigned long hash(const char *str) {
 // Initialize empty hashmap
 static inline void hashMapInit(HashMap *m) {
     // Initialize all buckets to null
-    for (int i = 0; i < HM_TABLE_SIZE; i++)
+    for(int i = 0; i < HM_TABLE_SIZE; i++)
         m->buckets[i] = NULL;
 
     m->usedCount = 0;
@@ -69,7 +81,7 @@ static inline void hashMapPut(HashMap *m, const char *key, int value) {
     HashMapEntry *e = m->buckets[h];
 
     while(e) { // Update existing key
-        if (strcmp(e->key, key) == 0) {
+        if(strcmp(e->key, key) == 0) {
             e->value = value;
             return;
         }
@@ -77,7 +89,7 @@ static inline void hashMapPut(HashMap *m, const char *key, int value) {
     }
 
     // Add bucket to used buckets if first entry
-    if (m->buckets[h] == NULL) 
+    if(m->buckets[h] == NULL) 
         m->usedBuckets[m->usedCount++] = h;
 
     // Create new entry
@@ -89,13 +101,29 @@ static inline void hashMapPut(HashMap *m, const char *key, int value) {
 }
 
 
+char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*)) {
+    unsigned long h = hash(key) % HM_TABLE_SIZE;
+    HashMapEntry *e = m->buckets[h];
+
+    while(e) {
+        if(strcmp(e->key, key) == 0) { // Check if correct key
+            // Apply fn to entry
+            fn(e->key, &e->value);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+
 // Retrieve value associated with key in hashmap
 static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
     while(e) { // Iterate through bucket entries
-        if (strcmp(e->key, key) == 0) { // Check if correct key
+        if(strcmp(e->key, key) == 0) { // Check if correct key
             // Key found
             *outValue = e->value;
             return 1;
@@ -105,7 +133,6 @@ static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
 
     return 0; // Key not found
 }
-
 
 
 static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int)) {
@@ -134,6 +161,54 @@ static inline void hashMapFree(HashMap *m) {
             free(e->key);
             free(e);
             e = next;
+        }
+    }
+}
+
+
+// Initialize hashmap iterator
+static inline void iteratorInit(HashMapIterator *it, HashMap *map) {
+    it->map = map;
+    it->bucketIndex = 0;
+    it->entry = NULL;
+
+    // Find first non-empty bucket
+    while(it->bucketIndex < map->usedCount) {
+        int b = map->usedBuckets[it->bucketIndex];
+
+        if(map->buckets[b]) {
+            it->entry = map->buckets[b];
+            break;
+        }
+
+        it->bucketIndex++;
+    }
+}
+
+
+// Advance HashMap iterator and retrieve key/value
+static inline void iteratorNext(HashMapIterator *it, const char **key, int *value) {
+    if(!it->entry) { // No more entries
+        *key = NULL
+    } else { // Process next entry
+        *key = it->entry->key;
+        *value = it->entry->value;
+
+        // Move to next entry in current bucket
+        if(it->entry->next) { // Move to next entry in bucket
+            it->entry = it->entry->next;
+        } else { // Move to next used bucket
+            it->bucketIndex++;
+            it->entry = NULL;
+
+            while(it->bucketIndex < it->map->usedCount) {
+                int b = it->map->usedBuckets[it->bucketIndex++]; // Get next used bucket index
+
+                if(it->map->buckets[b]) {
+                    it->entry = it->map->buckets[b];
+                    break;
+                }
+            }
         }
     }
 }

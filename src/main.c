@@ -6,6 +6,10 @@
 
 #include "mpi.h"
 
+// include hashmap
+#define HASHMAP_IMPLEMENTATON // Compiles implementation code
+#include "../include/hashmap.h" // Compiles public api
+
 
 // Error messages
 #define ERR_MSG_ARGS "\nUsage: %s <path-to-text-file>" // Argument missing from program call
@@ -14,6 +18,10 @@
 // Return codes
 #define ERR_CODE 1
 #define SUCCESS_CODE 0
+
+#define MAX_WORD_LEN 1024
+#define READ_BUF_SIZE (32 * 1024 * 1024) // 32MB buffer size for fread
+
 
 // Gets size of file in bytes as long long
 // Resets file pointer position to start
@@ -70,10 +78,85 @@ char* getTitleWord(FILE* file, long long* fileOffset) {
 
 }
 
+void incWord(const char* word, int* count) {
+    (*count)++;
+}
+
 
 void processFileChunk(FILE* file, long long chunkSize) {
     // Create hashmap to store title-cased words
+    HashMap map;
+    hashMapInit(&map);
 
+    long long bytesRead = 0;
+
+    static char leftover[MAX_WORD_LEN] = {0};
+    char* buffer = malloc(READ_BUF_SIZE + MAX_WORD_LEN); // extra space for leftover
+    
+    if(!buffer) // Error allocating buffer memory
+        return;
+
+    while(bytesRead < chunkSize) { // Read to end of buffer
+        size_t toRead = READ_BUF_SIZE; // Max buffer size
+
+        // Reduce buffer size if exceeds end of chunk
+        if(chunkSize - bytesRead < (long long)READ_BUF_SIZE)
+            toRead = (size_t)(chunkSize - bytesRead);
+
+        // Copy leftover from previous chunk to beginning of buffer
+        size_t leftoverLen = strlen(leftover);
+        
+        if(leftoverLen > 0) 
+            memcpy(buffer, leftover, leftoverLen);
+
+        size_t n = fread(buffer + leftoverLen, 1, toRead, file);
+        if (n == 0) break; // EOF
+
+        n += leftoverLen; // total valid bytes in buffer
+        bytesRead += n - leftoverLen;
+
+        size_t start = 0;
+        for (size_t i = 0; i < n; ++i) {
+            if (isspace((unsigned char)buffer[i])) {
+                if (start < i) {
+                    buffer[i] = '\0';
+                    
+                    // Increment count or initialize as zero
+                    if(!hashMapApply(&map, buffer + start))
+                        hashMapPut(&map, buffer + start, 0);
+                }
+                start = i + 1;
+            }
+        }
+
+        // Handle leftover at end of buffer (partial word)
+        if (start < n) {
+            size_t leftoverSize = n - start;
+            if (leftoverSize >= MAX_WORD_LEN) leftoverSize = MAX_WORD_LEN - 1;
+            memcpy(leftover, buffer + start, leftoverSize);
+            leftover[leftoverSize] = '\0';
+        } else {
+            leftover[0] = '\0';
+        }
+
+        // If less than chunkSize read, break (EOF)
+        if (n - leftoverLen < toRead) break;
+    }
+
+    // After finishing chunk, process leftover if it’s a complete word
+    if (strlen(leftover) > 0) {
+        hashMapPut(map, leftover);
+        leftover[0] = '\0';
+    }
+
+    free(buffer);
+
+
+
+
+
+
+    char* buffer;
     long long chunkOffset = 0; // Tracks offset within file chunk
 
     while(chunkOffset < chunkSize) {
@@ -100,6 +183,16 @@ void runWorkerProcess() {
         // processFileChunk(fileChunk, chunkSize);
         // Send ready message
         // msgResponse <- response
+
+}
+
+void mergeEntry(const char* word, int count) {
+    
+}
+
+
+void mergeMap(HashMap* main, HashMap* merge) {
+    hashMapMap(&merge, mergeEntry);
 
 }
 
