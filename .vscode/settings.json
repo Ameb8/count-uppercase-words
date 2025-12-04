@@ -19,6 +19,11 @@
         "array": "c",
         "functional": "c",
         "type_traits": "c",
-        "utility": "c"
+        "utility": "c",
+        "map": "c",
+        "set": "c",
+        "unordered_map": "c",
+        "unordered_set": "c",
+        "algorithm": "c"
     }
 }

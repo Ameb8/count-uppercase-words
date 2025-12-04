@@ -152,10 +152,6 @@ void processFileChunk(FILE* file, long long chunkSize) {
     free(buffer);
 
 
-
-
-
-
     char* buffer;
     long long chunkOffset = 0; // Tracks offset within file chunk
 
@@ -165,7 +161,7 @@ void processFileChunk(FILE* file, long long chunkSize) {
 
         if(nextWord) { // Next word is title cased
             // Add to hashmap
-
+            
             // Add 
         }
 
@@ -186,13 +182,27 @@ void runWorkerProcess() {
 
 }
 
-void mergeEntry(const char* word, int count) {
-    
-}
-
 
 void mergeMap(HashMap* main, HashMap* merge) {
-    hashMapMap(&merge, mergeEntry);
+    // Initialize iterator for merging map
+    HashMapIterator iter;
+    iteratorInit(&iter, merge);
+
+    // Initialize vars to hold next word count in merging map
+    const char* nextWord;
+    int count;
+
+    // Nested function 
+    void incrementBy(const char *key, int *value) {
+        *value += count;
+    }
+
+    while(iteratorNext(&iter, &nextWord, &count)) {
+        // Increment main hashmap word count if contains key
+        if(!hashMapUpdate(main, nextWord, incrementBy))
+            hashMapPut(main, nextWord, count); // Add key to main hashmap
+    }
+
 
 }
 
@@ -209,6 +219,7 @@ void runManagerProcess(int numProcesses, FILE* file, long long chunkSize) {
             nextChunkSize = fileSize - nextChunkOffset;
 
         // Respond to worker message with next file chunk
+
 
         nextChunkOffset += chunkSize; // Update next chunk offset
     }
@@ -247,7 +258,7 @@ int main(int argc, char* argv[]) {
         return ERR_CODE;
     }
 
-    if(errCode )
+    
 
     if(!id) {
         if(argc < 2) { // Filepath argument missing
@@ -257,7 +268,7 @@ int main(int argc, char* argv[]) {
 
         long long fileSize = getFileSize(file); // Get file size in Bytes
         
-        // Get start/end offsets and size of section bieng read by process
+        // Get start/end offsets and size of section being read by process
         long long sectionSize = fileSize / (p - 1); // Get section size in Bytes
         long long fileOffset = sectionSize * id; // Get section start offset in Bytes
         long long endOffset = fileOffset + sectionSize; // Get section end offset in bytes
@@ -281,7 +292,7 @@ int main(int argc, char* argv[]) {
 
     // Convert hashmap to array of words
 
-    // Sort array lexiographically
+    // Sort array lexigraphically
 
     // Merge arrays
 

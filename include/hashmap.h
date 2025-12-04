@@ -25,6 +25,7 @@ typedef struct {
     HashMapEntry *buckets[HM_TABLE_SIZE]; // Array-based hashmap
     int usedBuckets[HM_TABLE_SIZE]; // Tracks buckets with values
     int usedCount; // Tracks number of used buckets
+    int size;
 } HashMap;
 
 
@@ -36,16 +37,16 @@ typedef struct {
 
 
 // Public HashMap API
-void hashMapInit(HashMap *m);
-void hashMapPut(HashMap *m, const char *key, int value);
-char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int));
-int hashMapGet(HashMap *m, const char *key, int *outValue);
-void hashMapMap(HashMap *m, void (*fn)(const char *, int));
-void hashMapFree(HashMap *m);
+static inline void hashMapInit(HashMap *m);
+static inline void hashMapPut(HashMap *m, const char *key, int value);
+static inline char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*));
+static inline int hashMapGet(HashMap *m, const char *key, int *outValue);
+static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int));
+static inline void hashMapFree(HashMap *m);
 
 // Public Iterator API
-void iteratorInit(HashMapIterator *it, HashMap *map);
-void iteratorNext(HashMapIterator *it, const char **key, int *value);
+static inline void iteratorInit(HashMapIterator *it, HashMap *map);
+static inline char iteratorNext(HashMapIterator *it, const char **key, int *value);
 
 #endif // HASHMAP_H
 
@@ -72,6 +73,7 @@ static inline void hashMapInit(HashMap *m) {
         m->buckets[i] = NULL;
 
     m->usedCount = 0;
+    m->size = 0;
 }
 
 
@@ -98,19 +100,22 @@ static inline void hashMapPut(HashMap *m, const char *key, int value) {
     e->value = value;
     e->next = m->buckets[h];
     m->buckets[h] = e;
+    m->size++;
 }
 
 
-char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*)) {
+static inline char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*)) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
-    while(e) {
+    while(e) { // 
         if(strcmp(e->key, key) == 0) { // Check if correct key
             // Apply fn to entry
             fn(e->key, &e->value);
             return 1;
         }
+
+        e = e->next; // Advance to next entry in bucket
     }
 
     return 0;
@@ -128,7 +133,8 @@ static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
             *outValue = e->value;
             return 1;
         }
-        e = e->next;
+
+        e = e->next; 
     }
 
     return 0; // Key not found
@@ -187,9 +193,10 @@ static inline void iteratorInit(HashMapIterator *it, HashMap *map) {
 
 
 // Advance HashMap iterator and retrieve key/value
-static inline void iteratorNext(HashMapIterator *it, const char **key, int *value) {
+static inline char iteratorNext(HashMapIterator *it, const char **key, int *value) {
     if(!it->entry) { // No more entries
-        *key = NULL
+        *key = NULL;
+        return 0;
     } else { // Process next entry
         *key = it->entry->key;
         *value = it->entry->value;
@@ -211,6 +218,8 @@ static inline void iteratorNext(HashMapIterator *it, const char **key, int *valu
             }
         }
     }
+
+    return 1;
 }
 
 
