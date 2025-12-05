@@ -213,7 +213,7 @@ static inline long long getFileSize(FILE* file) {
     return size;
 }
 
-
+/*
 int main(int argc, char* argv[]) {
     int id = 0;
 
@@ -263,7 +263,7 @@ int main(int argc, char* argv[]) {
 
         if(chunkSize == 0) break; // EOF reached
         
-        processSegment(fileChunk, chunkSize - MAX_WORD_LEN, MAX_WORD_LEN, id); // Process chunk
+        processSegment(fileChunk, chunkSize - MAX_WORD_LEN, MAX_WORD_LEN); // Process chunk
         //fseeko(file, (off_t) MAX_CHUNK_SIZE, SEEK_CUR); // Advance file pointer
 
         // DEBUG *******
@@ -272,8 +272,11 @@ int main(int argc, char* argv[]) {
 
     return SUCCESS_CODE;
 }
+*/
 
-void runWorker(FILE* file, int procID) {
+
+
+int runWorker(FILE* file, int procID) {
     int chunkOffset;
     
     // Allocate chunk buffer on heap
@@ -304,15 +307,16 @@ void runWorker(FILE* file, int procID) {
         int numTitleWords = processSegment(fileChunk, chunkSize, spilloverSize);
 
         // Return title words to manager
-        MPI_SEND(&numTitleWords, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
+        MPI_Send(&numTitleWords, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
     }
+
+    return SUCCESS_CODE;
 }
 
 
 int main(int argc, char* argv[]) {
-    int procID, numProcs, totalValidIds; // Process id, number of MPI processes, and number of valid IDs
+    int procID, numProcs; // Total number of processes and rank
     double elapsedTime; // Tracks wall-clock execution time
-    int processValidIds = 0; // Tracks valid IDs found per process
 
 
     FILE* file = fopen(argv[1], "r"); // Attempt to open text file
@@ -345,7 +349,7 @@ int main(int argc, char* argv[]) {
         
         // Send initial jobs to each worker
         for(int i = 0; i < activeWorkers && curChunkOffset < fileSize; i++) {
-            MPI_SEND(&curChunkOffset, 1, MPI_INT, i + 1, TAG_TASK, MPI_COMM_WORLD);
+            MPI_Send(&curChunkOffset, 1, MPI_INT, i + 1, TAG_TASK, MPI_COMM_WORLD);
             curChunkOffset += MAX_CHUNK_SIZE;
             activeWorkers++;
         }
@@ -370,9 +374,11 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        printf("\n\n\nTotal title-cased words found:\t%d\n", numTitleWords);
     } else { // Run worker process
         runWorker(file, procID);
     }
+
 
     // Exit program gracefully
     MPI_Finalize();
