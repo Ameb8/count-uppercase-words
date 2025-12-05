@@ -164,6 +164,10 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
 
                 // Check if spillover word is valid title-cased word
                 if(bytesRead < chunkSize + spilloverSize && isspace((unsigned char) *curByte)) {
+                    // Truncate words greater than MAX_WORD_LEN - 1
+                    if(wordSize >= MAX_WORD_LEN - 1)
+                        wordSize = MAX_WORD_LEN - 1;
+                    
                     // Extract null-terminated word on stack
                     char word[MAX_WORD_LEN]; // Static buffer
                     memcpy(word, wordStart, wordSize); // Copy memory bytes
@@ -210,7 +214,7 @@ int runWorker(FILE* file, int procID) {
     int chunkOffset;
     
     // Allocate chunk buffer on heap
-    char* fileChunk = malloc(sizeof(char) * MAX_CHUNK_SIZE);
+    char* fileChunk = malloc(sizeof(char) * (MAX_CHUNK_SIZE + MAX_WORD_LEN));
 
     if(!fileChunk) // Memory allocation failed
         return ERR_CODE;
