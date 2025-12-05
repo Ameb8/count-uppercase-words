@@ -20,7 +20,14 @@
 #define ERR_CODE 1
 #define SUCCESS_CODE 0
 
-// #define READ_BUF_SIZE (32 * 1024 * 1024) // 32MB buffer size for fread
+// Read chunk and max word sizes
+#define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 4 MB chunks
+#define MAX_WORD_LEN 128
+
+// MPI message tags
+#define TAG_TASK 1
+#define TAG_RESULT 2
+#define TAG_STOP 3
 
 
 typedef struct {
@@ -28,13 +35,6 @@ typedef struct {
     long long size;
 } FileChunk;
 
-
-#define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 4 MB chunks
-#define MAX_WORD_LEN 128
-
-#define TAG_TASK 1
-#define TAG_RESULT 2
-#define TAG_STOP 3
 
 static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
     // Create iterator for source map
@@ -74,13 +74,16 @@ static inline bool advanceNextWord(char** curByte, size_t* bytesRead, size_t num
     return *bytesRead < numBytes; // Return true if more bytes to read
 }
 
+
 void incCount(const char* word, int* count) {
     (*count)++;
 }
 
+
 void printWord(char* word, int* count) {
     printf("%s:\t%d\n", word, *count);
 }
+
 
 void printMap(HashMap* map) {
     HashMapIterator iter;
@@ -92,6 +95,7 @@ void printMap(HashMap* map) {
     while(iteratorNext(&iter, &word, &count)) 
         printf("%s:\t%d\n", word, count);
 }
+
 
 int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
     // Create hashmap to store title-cased words
@@ -135,14 +139,19 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
             if(isspace((unsigned char) *curByte)) {
                 // Extract null-terminated word on stack
                 char word[MAX_WORD_LEN]; // Static buffer
+                
+                // Truncate words greater than MAX_WORD_LEN - 1
+                if(wordSize > MAX_WORD_LEN - 1);
+                    wordSize = MAX_WORD_LEN - 1;
+
                 memcpy(word, wordStart, wordSize); // Copy memory bytes
                 word[wordSize] = '\0'; // Append null terminator
 
                 //printf("\n\n%zu-len Title-Word Found:\t\"%s\"", wordSize, word); // DEBUG *******
 
                 // Add to hashmap
-                //if(!hashMapUpdate(&map, word, incCount))
-                    //hashMapPut(&map, word, 1); 
+                if(!hashMapUpdate(&map, word, incCount))
+                    hashMapPut(&map, word, 1); 
             // Title-cased word overlaps end of file
             } else if(bytesRead == chunkSize) {
                 // Advanced to end or non-lowercase of spillover word
@@ -170,7 +179,7 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
 
     // DEBUG *******
     //printf("\n\nSegment Processed:\n"); // DEBUG ********
-    printMap(&map);
+    //printMap(&map);
     // END DEBUG ***
 
     // Get title words and free map
@@ -181,23 +190,6 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
 }
 
 
-
-
-
-/*
-int runWorker(FILE* file, int id) {
-    // Allocate chunk buffer
-     char* fileChunk = malloc(sizeof(char) * MAX_CHUNK_SIZE);
-    
-    if(!fileChunk) // Memory allocation failed
-        return ERR_CODE;
-
-    size_t chunkSize = fread(fileChunk, 1, MAX_CHUNK_SIZE, file);
-
-    processSegment(fileChunk, chunkSize, id);
-
-    return SUCCESS_CODE;
-}*/
 
 // Gets size of file in bytes as long long
 // Resets file pointer position to start
@@ -212,68 +204,6 @@ static inline long long getFileSize(FILE* file) {
     
     return size;
 }
-
-/*
-int main(int argc, char* argv[]) {
-    int id = 0;
-
-    FILE* file = fopen(argv[1], "r"); // Attempt to open text file
-
-    if(!file) { // Error opening file
-        fprintf(stderr, ERR_MSG_FNO, argv[1], strerror(errno));
-        return ERR_CODE;
-    }
-
-    // Append empty space to file to handle first file chunk
-
-    long long fileSize = getFileSize(file); // Get file size
-
-    // DEBUG *******
-    printf("%s (%lldB) opened successfully\n", argv[1], fileSize);
-
-    size_t numChunks = (size_t) fileSize / MAX_CHUNK_SIZE;
-    size_t lastChunkSize = (size_t) fileSize % MAX_CHUNK_SIZE;
-
-    if(lastChunkSize)
-        numChunks++;
-
-    // DEBUG *******
-    printf("Number of Chunks: %zu\tChunk Size: %d\tLast Chunk Size: %zu\n", numChunks, MAX_CHUNK_SIZE, lastChunkSize);
-
-    // Allocate chunk buffer on heap
-    char* fileChunk = malloc(sizeof(char) * MAX_CHUNK_SIZE);
-
-    if(!fileChunk) // Memory allocation failed
-        return ERR_CODE;
-
-    // Initialize hashmap to hold title words
-    HashMap titleWords;
-    hashMapInit(&titleWords);
-
-    // Process all chunks
-    for(size_t i = 0; i < numChunks; i++) {
-        printf("Iteration %zu\n", i); // DEBUG *******
-        fflush(stdout);
-
-        // Read chunk into memory
-        size_t chunkSize = fread(fileChunk, 1, MAX_CHUNK_SIZE + MAX_WORD_LEN, file);
-
-        printf("\nChunk %zu read\tsize = %zu", i, chunkSize); // DEBUG ******
-        fflush(stdout);
-
-        if(chunkSize == 0) break; // EOF reached
-        
-        processSegment(fileChunk, chunkSize - MAX_WORD_LEN, MAX_WORD_LEN); // Process chunk
-        //fseeko(file, (off_t) MAX_CHUNK_SIZE, SEEK_CUR); // Advance file pointer
-
-        // DEBUG *******
-        printf("\n\nSEGMENT PROCESSED (i=%zu)\n\n", i);
-    }
-
-    return SUCCESS_CODE;
-}
-*/
-
 
 
 int runWorker(FILE* file, int procID) {
@@ -290,8 +220,11 @@ int runWorker(FILE* file, int procID) {
         // Receive next task from manager
         MPI_Recv(&chunkOffset, 1, MPI_INT, 0, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
-        if(chunkOffset == -1) // No mor chunks to process
+        if(chunkOffset == -1) // No more chunks to process
             break;
+
+        // Move file pointer to start of chunk
+        fseeko(file, chunkOffset, SEEK_SET);
 
         // Read chunk into memory
         size_t chunkSize = fread(fileChunk, 1, MAX_CHUNK_SIZE + MAX_WORD_LEN, file);
@@ -318,6 +251,10 @@ int main(int argc, char* argv[]) {
     int procID, numProcs; // Total number of processes and rank
     double elapsedTime; // Tracks wall-clock execution time
 
+    // Initialize MPI environment
+    MPI_Init(&argc, &argv); // Initialize MPI environment
+    MPI_Comm_rank(MPI_COMM_WORLD, &procID); // Assign process identifier to id
+    MPI_Comm_size(MPI_COMM_WORLD, &numProcs); // Assign number of processes to p
 
     FILE* file = fopen(argv[1], "r"); // Attempt to open text file
 
@@ -328,13 +265,6 @@ int main(int argc, char* argv[]) {
 
     // Append empty space to file to handle first file chunk
     // Manager read first file word into map
-
-
-    // Initialize MPI environment
-    MPI_Init(&argc, &argv); // Initialize MPI environment
-    MPI_Comm_rank(MPI_COMM_WORLD, &procID); // Assign process identifier to id
-    MPI_Comm_size(MPI_COMM_WORLD, &numProcs); // Assign number of processes to p
-    //createElementType(); // Create MPI datatype for title-cased words
 
     // Begin benchmark timing
     MPI_Barrier(MPI_COMM_WORLD); // Wait for processes
@@ -348,8 +278,12 @@ int main(int argc, char* argv[]) {
         int numTitleWords = 0;
         
         // Send initial jobs to each worker
-        for(int i = 0; i < activeWorkers && curChunkOffset < fileSize; i++) {
-            MPI_Send(&curChunkOffset, 1, MPI_INT, i + 1, TAG_TASK, MPI_COMM_WORLD);
+        for(int i = 1; i < numProcs && curChunkOffset < fileSize; i++) {
+            #ifdef DBG // DEBUG PRINT
+                printf("\nInitial chunk at Byte-%d assigned to process %d", curChunkOffset, i);
+            #endif
+
+            MPI_Send(&curChunkOffset, 1, MPI_INT, i, TAG_TASK, MPI_COMM_WORLD);
             curChunkOffset += MAX_CHUNK_SIZE;
             activeWorkers++;
         }
@@ -364,10 +298,22 @@ int main(int argc, char* argv[]) {
             int freeWorker = status.MPI_SOURCE;
             numTitleWords += result;
 
-            if((long long) curChunkOffset < fileSize) {
+            #ifdef DBG // DEBUG PRINT
+                printf("\n%d/%d title-words read by process %d",result, numTitleWords, freeWorker);
+            #endif
+
+            if((long long) curChunkOffset < fileSize) { // Assign next chunk to free worker
+                #ifdef DBG // DEBUG PRINT
+                    printf("\nChunk at Byte-%d assigned to process %d", curChunkOffset, freeWorker);
+                #endif
+
                 MPI_Send(&curChunkOffset, 1, MPI_INT, freeWorker, TAG_TASK, MPI_COMM_WORLD);
                 curChunkOffset += MAX_CHUNK_SIZE;
-            } else {
+            } else { // Send stop signal to free worker
+                #ifdef DBG // DEBUG PRINT
+                    printf("\nStop signal sent to process %d", freeWorker);
+                #endif
+                
                 int stop = -1;
                 MPI_Send(&stop, 1, MPI_INT, freeWorker, TAG_STOP, MPI_COMM_WORLD);
                 activeWorkers--;
@@ -384,76 +330,4 @@ int main(int argc, char* argv[]) {
     MPI_Finalize();
     return SUCCESS_CODE;
 }
-        /*
-        // Get number of chunks and leftover
-        size_t numChunks = (size_t) fileSize / MAX_CHUNK_SIZE;
-        size_t lastChunkSize = (size_t) fileSize % MAX_CHUNK_SIZE; // Size of last chunk
 
-        if(lastChunkSize) // Increment number of chunks if leftover
-            numChunks++;
-
-
-
-
-
-
-
-
-        // Divide chunks between worker processes
-        size_t chunksPerWorker = numChunks / (size_t) (numProcs - 1);
-        size_t leftoverChunks = numChunks % (size_t) (numProcs - 1);
-        
-        size_t chunksAssigned = 0; // Tracks number of chunks to assign
-
-        // Send number of chunks and file start offset to each worker process
-        for(int i = 1; i < numProcs; i++) {
-            size_t procChunks = chunksPerWorker; // Default number of chunks
-
-            // Equally distribute leftover chunks
-            if((size_t) (i - 1) < leftoverChunks)
-                procChunks++;
-        
-            // Calculate start of processes' segment
-            long long segmentOffset = chunksAssigned * MAX_CHUNK_SIZE;
-
-
-        }
-        
-    }
-
-    FILE* file = fopen(argv[1], "r"); // Attempt to open text file
-
-    if(!file) { // Error opening file
-        fprintf(stderr, ERR_MSG_FNO, argv[1], strerror(errno));
-        return ERR_CODE;
-    }
-
-
-    if(!id) {
-        if(argc < 2) { // Filepath argument missing
-            fprintf(stderr, ERR_MSG_ARGS, argv[0]);
-            return ERR_CODE;
-        }
-
-        runManagerProcess(p - 1, file);
-    } else {
-        runWorkerProcess(file);
-    }
-
-
-    // Convert hashmap to array of words
-
-    // Sort array lexigraphically
-
-    // Merge arrays
-
-    // return merged array length
-
-    // Wait for all processes
-
-    // End benchmark time
-
-    // Output array length as number of title-cased words
-
-    return SUCCESS_CODE;
-}*/
