@@ -32,6 +32,27 @@ typedef struct {
 #define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 4 MB chunks
 #define MAX_WORD_LEN 128
 
+static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
+    // Create iterator for source map
+    HashMapIterator it;
+    iteratorInit(&it, src);
+
+    // Holds source map entries
+    const char *key;
+    int value;
+
+    // Iterate through source entries
+    while(iteratorNext(&it, &key, &value)) {
+        int existing;
+
+        if(hashMapGet(dst, key, &existing)) // key exists, sum counts
+            hashMapPut(dst, key, existing + value);
+         else // key does not exist, copy entry from source
+            hashMapPut(dst, key, value);
+    }
+}
+
+
 static inline bool advanceNextWord(char** curByte, size_t* bytesRead, size_t numBytes) {
     
     // Advanced to end of current word
@@ -77,18 +98,14 @@ int processSegment(char* fileChunk, size_t chunkSize, int id) {
     char* curByte = fileChunk; // Pointer to current position
     size_t bytesRead = 0; // Number of bytes read
 
-    int i = 0; // DEBUG *******
+    // int i = 0; // DEBUG *******
 
     while(advanceNextWord(&curByte, &bytesRead, chunkSize)) {
         // DEBUG *******
-        printf("Loop Entered (%zu / %zu Bytes Read)\n", bytesRead, chunkSize);
-        fflush(stdout);
-
-
-        // DEBUG *******
-        i++;
-        if(bytesRead > 10 || i > 10)
-            break;
+        //printf("\n\nLoop Entered (%zu / %zu Bytes Read)\n", bytesRead, chunkSize);
+        //printf("Starting chars: %c, %c, %c\n", curByte[0], curByte[1], curByte[2]);
+        //fflush(stdout);
+        // END DEBUG ***
 
         char* wordStart = curByte; // Mark start of word
         size_t wordSize = 0; 
@@ -100,7 +117,9 @@ int processSegment(char* fileChunk, size_t chunkSize, int id) {
             bytesRead++;
             curByte++;
 
-            // count subsequent lowercase letters
+            //printf("\nStart of title-word found: %c/n", *wordStart); // DEBUG *******
+
+            // Count subsequent lowercase letters
             while(bytesRead < chunkSize && islower((unsigned char) *curByte)) {
                 // Advanced file pointer
                 wordSize++;
@@ -115,14 +134,16 @@ int processSegment(char* fileChunk, size_t chunkSize, int id) {
                 memcpy(word, wordStart, wordSize); // Copy memory bytes
                 word[wordSize] = '\0'; // Append null terminator
 
+                //printf("\n\n%zu-len Title-Word Found:\t\"%s\"", wordSize, word); // DEBUG *******
+
                 // Add to hashmap
                 if(!hashMapUpdate(&map, word, incCount))
-                    hashMapPut(&map, wordStart, 1); 
+                    hashMapPut(&map, word, 1); 
             } 
         }
     }
 
-    printf("\n\nSegment Processed:\n"); // DEBUG ********
+    //printf("\n\nSegment Processed:\n"); // DEBUG ********
 
     printMap(&map);
     return SUCCESS_CODE;
@@ -205,7 +226,7 @@ int main(int argc, char* argv[]) {
         //fseeko(file, (off_t) MAX_CHUNK_SIZE, SEEK_CUR); // Advance file pointer
 
         // DEBUG *******
-        printf("\n\nSEGMENT PROCESSED\n\n");
+        printf("\n\nSEGMENT PROCESSED (i=%zu)\n\n", i);
     }
 
     return SUCCESS_CODE;
