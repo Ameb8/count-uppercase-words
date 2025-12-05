@@ -32,6 +32,10 @@ typedef struct {
 #define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 4 MB chunks
 #define MAX_WORD_LEN 128
 
+#define TAG_TASK 1
+#define TAG_RESULT 2
+#define TAG_STOP 3
+
 static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
     // Create iterator for source map
     HashMapIterator it;
@@ -89,7 +93,7 @@ void printMap(HashMap* map) {
         printf("%s:\t%d\n", word, count);
 }
 
-int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize, int id) {
+int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
     // Create hashmap to store title-cased words
     HashMap map;
     hashMapInit(&map);
@@ -164,10 +168,16 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize, int 
         }
     }
 
+    // DEBUG *******
     //printf("\n\nSegment Processed:\n"); // DEBUG ********
-
     printMap(&map);
-    return SUCCESS_CODE;
+    // END DEBUG ***
+
+    // Get title words and free map
+    int numTitleWords = map.size;
+    hashMapFree(&map);
+
+    return numTitleWords;
 }
 
 
@@ -263,7 +273,7 @@ int main(int argc, char* argv[]) {
     return SUCCESS_CODE;
 }
 
-int runWorker(FILE* file, int procID) {
+void runWorker(FILE* file, int procID) {
     int chunkOffset;
     
     // Allocate chunk buffer on heap
@@ -281,10 +291,20 @@ int runWorker(FILE* file, int procID) {
             break;
 
         // Read chunk into memory
+        size_t chunkSize = fread(fileChunk, 1, MAX_CHUNK_SIZE + MAX_WORD_LEN, file);
+        size_t spilloverSize = MAX_WORD_LEN;
+
+        if(chunkSize < MAX_CHUNK_SIZE) // Partial file chunk
+            spilloverSize = 0;
+        // Full file chunk with partial spillover
+        else if(chunkSize < MAX_CHUNK_SIZE + MAX_WORD_LEN)
+            spilloverSize = chunkSize - MAX_CHUNK_SIZE;
 
         // Process file chunk
+        int numTitleWords = processSegment(fileChunk, chunkSize, spilloverSize);
 
         // Return title words to manager
+        MPI_SEND(&numTitleWords, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
     }
 }
 
@@ -303,28 +323,75 @@ int main(int argc, char* argv[]) {
     }
 
     // Append empty space to file to handle first file chunk
+    // Manager read first file word into map
 
 
     // Initialize MPI environment
     MPI_Init(&argc, &argv); // Initialize MPI environment
     MPI_Comm_rank(MPI_COMM_WORLD, &procID); // Assign process identifier to id
     MPI_Comm_size(MPI_COMM_WORLD, &numProcs); // Assign number of processes to p
-    createElementType(); // Create MPI datatype for title-cased words
+    //createElementType(); // Create MPI datatype for title-cased words
 
     // Begin benchmark timing
     MPI_Barrier(MPI_COMM_WORLD); // Wait for processes
     elapsedTime = -MPI_Wtime(); // Start benchmark time
 
 
-    if(!procID) {
+    if(!procID) { // Run manager process
         long long fileSize = getFileSize(file); // Get file size
+        int curChunkOffset = 0;
+        int activeWorkers = 0;
+        int numTitleWords = 0;
+        
+        // Send initial jobs to each worker
+        for(int i = 0; i < activeWorkers && curChunkOffset < fileSize; i++) {
+            MPI_SEND(&curChunkOffset, 1, MPI_INT, i + 1, TAG_TASK, MPI_COMM_WORLD);
+            curChunkOffset += MAX_CHUNK_SIZE;
+            activeWorkers++;
+        }
 
+        // Send chunks until none left
+        while(activeWorkers > 0) {
+            int result;
+            MPI_Status status;
+
+            // Block until worker is free
+            MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
+            int freeWorker = status.MPI_SOURCE;
+            numTitleWords += result;
+
+            if((long long) curChunkOffset < fileSize) {
+                MPI_Send(&curChunkOffset, 1, MPI_INT, freeWorker, TAG_TASK, MPI_COMM_WORLD);
+                curChunkOffset += MAX_CHUNK_SIZE;
+            } else {
+                int stop = -1;
+                MPI_Send(&stop, 1, MPI_INT, freeWorker, TAG_STOP, MPI_COMM_WORLD);
+                activeWorkers--;
+            }
+        }
+
+    } else { // Run worker process
+        runWorker(file, procID);
+    }
+
+    // Exit program gracefully
+    MPI_Finalize();
+    return SUCCESS_CODE;
+}
+        /*
         // Get number of chunks and leftover
         size_t numChunks = (size_t) fileSize / MAX_CHUNK_SIZE;
         size_t lastChunkSize = (size_t) fileSize % MAX_CHUNK_SIZE; // Size of last chunk
 
         if(lastChunkSize) // Increment number of chunks if leftover
             numChunks++;
+
+
+
+
+
+
+
 
         // Divide chunks between worker processes
         size_t chunksPerWorker = numChunks / (size_t) (numProcs - 1);
@@ -383,4 +450,4 @@ int main(int argc, char* argv[]) {
     // Output array length as number of title-cased words
 
     return SUCCESS_CODE;
-}
+}*/
