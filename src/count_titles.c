@@ -141,7 +141,7 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
                 char word[MAX_WORD_LEN]; // Static buffer
                 
                 // Truncate words greater than MAX_WORD_LEN - 1
-                if(wordSize > MAX_WORD_LEN - 1);
+                if(wordSize > MAX_WORD_LEN - 1)
                     wordSize = MAX_WORD_LEN - 1;
 
                 memcpy(word, wordStart, wordSize); // Copy memory bytes
