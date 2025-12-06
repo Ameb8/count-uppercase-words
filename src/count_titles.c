@@ -28,6 +28,8 @@
 #define TAG_TASK 1
 #define TAG_RESULT 2
 #define TAG_STOP 3
+#define TAG_WORDS 4
+#define TAG_WORDS_SIZE 5
 
 
 typedef struct {
@@ -108,7 +110,7 @@ static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
 
         if(hashMapGet(dst, key, &existing)) // key exists, sum counts
             hashMapPut(dst, key, existing + value);
-         else // key does not exist, copy entry from source
+        else // key does not exist, copy entry from source
             hashMapPut(dst, key, value);
     }
 }
@@ -154,10 +156,10 @@ void printMap(HashMap* map) {
 }
 
 
-int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
+void processSegment(HashMap* map, char* fileChunk, size_t chunkSize, size_t spilloverSize) {
     // Create hashmap to store title-cased words
-    HashMap map;
-    hashMapInit(&map);
+    //HashMap map;
+    //hashMapInit(&map);
     
     // Process chars individually
     char* curByte = fileChunk; // Pointer to current position
@@ -244,10 +246,10 @@ int processSegment(char* fileChunk, size_t chunkSize, size_t spilloverSize) {
     // END DEBUG ***
 
     // Get title words and free map
-    int numTitleWords = map.size;
-    hashMapFree(&map);
+    //int numTitleWords = map.size;
+    //hashMapFree(&map);
 
-    return numTitleWords;
+    //return numTitleWords;
 }
 
 
@@ -276,6 +278,9 @@ int runWorker(FILE* file, int procID) {
     if(!fileChunk) // Memory allocation failed
         return ERR_CODE;
 
+    // Create hashmap to track title-cased words
+    HashMap* map;
+
 
     while(1) { // Loop until STOP message received
         // Receive next task from manager
@@ -298,11 +303,19 @@ int runWorker(FILE* file, int procID) {
             spilloverSize = chunkSize - MAX_CHUNK_SIZE;
 
         // Process file chunk
-        int numTitleWords = processSegment(fileChunk, chunkSize, spilloverSize);
+        int numTitleWords = 0;
+        processSegment(&map, fileChunk, chunkSize, spilloverSize);
 
         // Return title words to manager
         MPI_Send(&numTitleWords, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
     }
+
+    // Serialize title-words to enable MPI communication
+    SerializedMap titleWords = serializeHashMap(&titleWords);
+
+    // Send words to manager
+    MPI_Send(&titleWords.size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); // Send size
+    MPI_Send(titleWords.data, titleWords.size, MPI_BYTE, 0, 0, MPI_COMM_WORLD); // Send data
 
     return SUCCESS_CODE;
 }
@@ -338,9 +351,10 @@ int main(int argc, char* argv[]) {
         int activeWorkers = 0;
         int numTitleWords = 0;
 
-        // Create hashmap to store all file's words
-        HashMap titleWords;
-        hashMapInit(&titleWords);
+        // Create 2D buffer to hold worker's serialized results
+        char** workerResults = malloc((numProcs - 1));
+        
+        int chunksProcessed = 0;
         
         // Send initial jobs to each worker
         for(int i = 1; i < numProcs && curChunkOffset < fileSize; i++) {
@@ -359,7 +373,7 @@ int main(int argc, char* argv[]) {
             MPI_Status status;
 
             // Block until worker is free
-            MPI_Recv(&result, 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
+            MPI_Recv(&titleWordsRcvd[chunksProcessed++], 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
             int freeWorker = status.MPI_SOURCE;
             numTitleWords += result;
 
@@ -384,6 +398,29 @@ int main(int argc, char* argv[]) {
                 activeWorkers--;
             }
         }
+        
+        // Receive serialized title-words from workers
+        for(int i = 0; i < numProcs - 1; i++) {
+            MPI_Status status; // MPI message status
+            int resultSize; // Size of worker's serialized results
+
+            // Get size of next result
+            MPI_Recv(&resultSize, 1, MPI_INT, MPI_ANY_SOURCE, TAG_WORDS_SIZE, MPI_COMM_WORLD, &status);
+
+            // Allocate memory for serialized results
+            workerResults[i] = malloc(resultSize);
+
+            // Get data from worker
+            MPI_Recv(&workerResults[i], resultSize, MPI_BYTE, status.MPI_SOURCE, TAG_WORDS, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+
+        // Create hashmap to store all file's words
+        HashMap titleWords;
+        hashMapInit(&titleWords);
+
+        // Add words to hashmap
+
+        // Output results
 
         printf("\n\n\nTotal title-cased words found:\t%d\n", numTitleWords);
     } else { // Run worker process
