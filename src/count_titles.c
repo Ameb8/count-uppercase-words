@@ -30,6 +30,7 @@
 #define TAG_STOP 3
 #define TAG_WORDS 4
 #define TAG_WORDS_SIZE 5
+#define TAG_READY 6
 
 
 typedef struct {
@@ -209,8 +210,8 @@ void processSegment(HashMap* map, char* fileChunk, size_t chunkSize, size_t spil
                 //printf("\n\n%zu-len Title-Word Found:\t\"%s\"", wordSize, word); // DEBUG *******
 
                 // Add to hashmap
-                if(!hashMapUpdate(&map, word, incCount))
-                    hashMapPut(&map, word, 1); 
+                if(!hashMapUpdate(map, word, incCount))
+                    hashMapPut(map, word, 1); 
             // Title-cased word overlaps end of file
             } else if(bytesRead == chunkSize) {
                 // Advanced to end or non-lowercase of spillover word
@@ -233,23 +234,12 @@ void processSegment(HashMap* map, char* fileChunk, size_t chunkSize, size_t spil
                     word[wordSize] = '\0'; // Append null terminator
 
                     // Add to hashmap
-                    if(!hashMapUpdate(&map, word, incCount))
-                        hashMapPut(&map, word, 1); 
+                    if(!hashMapUpdate(map, word, incCount))
+                        hashMapPut(map, word, 1); 
                 }
             }
         }
     }
-
-    // DEBUG *******
-    //printf("\n\nSegment Processed:\n"); // DEBUG ********
-    //printMap(&map);
-    // END DEBUG ***
-
-    // Get title words and free map
-    //int numTitleWords = map.size;
-    //hashMapFree(&map);
-
-    //return numTitleWords;
 }
 
 
@@ -303,15 +293,15 @@ int runWorker(FILE* file, int procID) {
             spilloverSize = chunkSize - MAX_CHUNK_SIZE;
 
         // Process file chunk
-        int numTitleWords = 0;
+        //int numTitleWords = 0;
         processSegment(&map, fileChunk, chunkSize, spilloverSize);
 
         // Return title words to manager
-        MPI_Send(&numTitleWords, 1, MPI_INT, 0, TAG_RESULT, MPI_COMM_WORLD);
+        MPI_Send(NULL, 0, MPI_INT, 0, TAG_READY, MPI_COMM_WORLD);
     }
 
     // Serialize title-words to enable MPI communication
-    SerializedMap titleWords = serializeHashMap(&titleWords);
+    SerializedMap titleWords = serializeHashMap(&map);
 
     // Send words to manager
     MPI_Send(&titleWords.size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); // Send size
@@ -369,13 +359,13 @@ int main(int argc, char* argv[]) {
 
         // Send chunks until none left
         while(activeWorkers > 0) {
-            int result;
-            MPI_Status status;
+            MPI_Status status; // Holds MPI message status
 
             // Block until worker is free
-            MPI_Recv(&titleWordsRcvd[chunksProcessed++], 1, MPI_INT, MPI_ANY_SOURCE, TAG_RESULT, MPI_COMM_WORLD, &status);
-            int freeWorker = status.MPI_SOURCE;
-            numTitleWords += result;
+            MPI_Recv(NULL, 0, MPI_BYTE, MPI_ANY_SOURCE, TAG_READY, MPI_COMM_WORLD, &status);
+            chunksProcessed++; // Increment file chunks processed
+            int freeWorker = status.MPI_SOURCE; // Get process ID of ready worker
+            
 
             #ifdef DBG // DEBUG PRINT
                 printf("\n%d/%d title-words read by process %d",result, numTitleWords, freeWorker);
@@ -422,7 +412,6 @@ int main(int argc, char* argv[]) {
 
         // Output results
 
-        printf("\n\n\nTotal title-cased words found:\t%d\n", numTitleWords);
     } else { // Run worker process
         runWorker(file, procID);
     }
