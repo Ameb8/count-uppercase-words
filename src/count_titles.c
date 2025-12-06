@@ -36,6 +36,63 @@ typedef struct {
 } FileChunk;
 
 
+typedef struct {
+    char* data;
+    int size;
+} SerializedMap;
+
+
+static inline SerializedMap serializeHashMap(HashMap* map) {
+    // Create iterator for hashmap
+    HashMapIterator it;
+    iteratorInit(&it, map);
+
+    // Stores next map entry
+    const char* key;
+    int value;
+
+    // Stores data size variables
+    int count = map->size;
+    int totalSize = sizeof(int);
+
+    // Count total data size in map
+    while(iteratorNext(&it, &key, &value)) {
+        int wordLen = strlen(key); // Get length of entry's key
+        totalSize += sizeof(int) + wordLen + sizeof(int); // Compute size of entry
+    }
+
+    // Allocate memory for serialized map
+    char* dataBuffer = malloc(totalSize); 
+    char* curByte = dataBuffer; // Pointer to current location
+
+    // Write number of entries to data
+    memcpy(curByte, &count, sizeof(int));
+    curByte += sizeof(int);
+
+    iteratorInit(&it, map); // Reset hashmap
+    
+    // Write serialized data
+    while(iteratorNext(&it, &key, &value)) {
+        int wordLen = strlen(key); // Get length of next key
+
+        // Copy length of next word into buffer
+        memcpy(curByte, &wordLen, sizeof(int)); // Copy data
+        curByte += sizeof(int); // Increment buffer pointer
+
+        // Copy char* key to buffer
+        memcpy(curByte, key, wordLen); // Copy data
+        curByte += wordLen; // Increment buffer pointer
+        
+        // Copy int value to buffer
+        memcpy(curByte, &value, sizeof(int)); // Copy data
+        curByte += sizeof(int); // Increment buffer pointer
+    }
+
+    SerializedMap out = {dataBuffer, totalSize};
+    return out;
+}
+
+
 static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
     // Create iterator for source map
     HashMapIterator it;
@@ -280,6 +337,10 @@ int main(int argc, char* argv[]) {
         int curChunkOffset = 0;
         int activeWorkers = 0;
         int numTitleWords = 0;
+
+        // Create hashmap to store all file's words
+        HashMap titleWords;
+        hashMapInit(&titleWords);
         
         // Send initial jobs to each worker
         for(int i = 1; i < numProcs && curChunkOffset < fileSize; i++) {

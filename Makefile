@@ -9,7 +9,7 @@ BIN_OPT = bin/count_opt
 
 # Compiler flags
 CFLAGS = -Wall -Wextra -O2 # Standard build
-CFLAGS_DBG = $(CFLAGS) -DDBG -g # Debug build
+CFLAGS_DBG = $(CFLAGS) -g -fsanitize=address -DDBG # Debug build
 CFLAGS_OPT = -Wall -Wextra -march=native -funroll-loops -flto # Optimized build
 
 all: $(BIN) # Default target
