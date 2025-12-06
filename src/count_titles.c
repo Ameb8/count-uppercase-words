@@ -259,7 +259,7 @@ static inline long long getFileSize(FILE* file) {
 }
 
 
-int runWorker(FILE* file, int procID) {
+int runWorker(FILE* file) {
     int chunkOffset;
     
     // Allocate chunk buffer on heap
@@ -269,7 +269,8 @@ int runWorker(FILE* file, int procID) {
         return ERR_CODE;
 
     // Create hashmap to track title-cased words
-    HashMap* map;
+    HashMap map;
+    hashMapInit(&map);
 
 
     while(1) { // Loop until STOP message received
@@ -413,7 +414,7 @@ int main(int argc, char* argv[]) {
         // Output results
 
     } else { // Run worker process
-        runWorker(file, procID);
+        runWorker(file);
     }
 
 
