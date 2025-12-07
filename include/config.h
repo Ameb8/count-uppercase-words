@@ -1,4 +1,4 @@
-#ifdef CONFIG_H
+#ifndef CONFIG_H
 #define CONFIG_H
 
 // Program return codes

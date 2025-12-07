@@ -1,4 +1,4 @@
-#ifdef WORKER_H
+#ifndef WORKER_H
 #define WORKER_H
 
 #include <stdio.h>

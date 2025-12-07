@@ -1,18 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>
-#include <stdbool.h>
+#include <errno.h>
 
 #include "mpi.h"
 
-#include "../include/worker.h"
-#include "../include/manager.h"
-#include "../include/config.h"
 
-
-// include hashmap
-#define HASHMAP_IMPLEMENTATION // Compiles implementation code
-#include "../include/hashmap.h" // Compiles public api
+#include "worker.h"
+#include "manager.h"
+#include "hashmap.h"
+#include "config.h"
 
 
 // Error messages

@@ -1,8 +1,9 @@
 #include "mpi.h"
 
-#include "../include/config.h"
+#include "config.h"
 
-#include "../include/manager.h"
+#include "manager.h"
+
 
 
 // Gets size of file in bytes as long long
@@ -25,7 +26,6 @@ int runManager(FILE* file, int numWorkers, HashMap* resultsMap) {
     long long fileSize = getFileSize(file); // Get file size
     int curChunkOffset = 0;
     int activeWorkers = 0;
-    int numTitleWords = 0;
 
     // Create 2D buffer to hold worker's serialized results
     char** workerResults = malloc((numWorkers));
@@ -54,7 +54,7 @@ int runManager(FILE* file, int numWorkers, HashMap* resultsMap) {
         
 
         #ifdef DBG // DEBUG PRINT
-            printf("\n%d/%d title-words read by process %d",result, numTitleWords, freeWorker);
+            printf("\nChunks processed by process %d", freeWorker);
         #endif
 
         if((long long) curChunkOffset < fileSize) { // Assign next chunk to free worker

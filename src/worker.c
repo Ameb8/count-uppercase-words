@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include "mpi.h"
 
-#include "../include/process_file.h"
-#include "../include/config.h"
+#include "process_file.h"
+#include "config.h"
 
-#include "../include/worker.h"
+#include "worker.h"
 
 
 typedef struct {

@@ -1,35 +1,44 @@
-CC = mpicc # Set compiler
+CC         = mpicc
+INCLUDES   = -Iinclude
+SRC        = $(wildcard src/*.c)
+OBJ        = $(SRC:src/%.c=obj/%.o)
 
-SRC = $(wildcard src/*.c) # Source .c files in src/
+CFLAGS     = -Wall -Wextra -O2 $(INCLUDES)
+CFLAGS_DBG = -Wall -Wextra -g -fsanitize=address -DDBG $(INCLUDES)
+CFLAGS_OPT = -Wall -Wextra -march=native -funroll-loops -flto $(INCLUDES)
 
-# Output binaries
-BIN = bin/count
-BIN_DBG = bin/count_dbg
-BIN_OPT = bin/count_opt
+BIN       = bin/count
+BIN_DBG   = bin/count_dbg
+BIN_OPT   = bin/count_opt
 
-# Compiler flags
-CFLAGS = -Wall -Wextra -O2 # Standard build
-CFLAGS_DBG = $(CFLAGS) -g -fsanitize=address -DDBG # Debug build
-CFLAGS_OPT = -Wall -Wextra -march=native -funroll-loops -flto # Optimized build
+# Default target
+all: $(BIN)
 
-all: $(BIN) # Default target
+# Create obj directory
+obj:
+	mkdir -p obj
+
+# Pattern rule: compile each .c to .o
+obj/%.o: src/%.c | obj
+	$(CC) -c $< -o $@ $(CFLAGS)
 
 # Normal build
-$(BIN): $(SRC)
-	$(CC) $(SRC) -o $@ $(CFLAGS)
+$(BIN): $(OBJ)
+	$(CC) $(OBJ) -o $@
 
 # Debug build
-$(BIN_DBG): $(SRC)
-	$(CC) $(SRC) -o $@ $(CFLAGS_DBG)
+dbg: CFLAGS = $(CFLAGS_DBG)
+dbg: clean $(BIN_DBG)
+
+$(BIN_DBG): $(OBJ)
+	$(CC) $(OBJ) -o $@
 
 # Optimized build
-$(BIN_OPT): $(SRC)
-	$(CC) $(SRC) -o $@ $(CFLAGS_OPT)
+opt: CFLAGS = $(CFLAGS_OPT)
+opt: clean $(BIN_OPT)
 
-# Aliases for convenience
-dbg: $(BIN_DBG) # Alias to build debug target
-opt: $(BIN_OPT) # Alias to build optimized target
+$(BIN_OPT): $(OBJ)
+	$(CC) $(OBJ) -o $@
 
-# Clean
 clean:
-	rm -f $(BIN) $(BIN_DBG)
+	rm -rf obj $(BIN) $(BIN_DBG) $(BIN_OPT)

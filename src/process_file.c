@@ -2,9 +2,9 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "../include/config.h"
+#include "config.h"
 
-#include "../include/process_file.h"
+#include "process_file.h"
 
 
 void incCount(const char* word, int* count) {

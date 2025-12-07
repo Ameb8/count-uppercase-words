@@ -37,25 +37,23 @@ typedef struct {
 
 
 // Public HashMap API
-static inline void hashMapInit(HashMap *m);
-static inline void hashMapPut(HashMap *m, const char *key, int value);
-static inline char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*));
-static inline int hashMapGet(HashMap *m, const char *key, int *outValue);
-static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int));
-static inline void hashMapFree(HashMap *m);
+void hashMapInit(HashMap *m);
+void hashMapPut(HashMap *m, const char *key, int value);
+char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*));
+int hashMapGet(HashMap *m, const char *key, int *outValue);
+void hashMapMap(HashMap *m, void (*fn)(const char *, int));
+void hashMapFree(HashMap *m);
 
 // Public Iterator API
-static inline void iteratorInit(HashMapIterator *it, HashMap *map);
-static inline char iteratorNext(HashMapIterator *it, const char **key, int *value);
-
-#endif // HASHMAP_H
+void iteratorInit(HashMapIterator *it, HashMap *map);
+char iteratorNext(HashMapIterator *it, const char **key, int *value);
 
 
 #ifdef HASHMAP_IMPLEMENTATION
 
 
 // djb2 hashing function
-static inline unsigned long hash(const char *str) {
+unsigned long hash(const char *str) {
     unsigned long hash = 5381; // Initial hash value
     int c; // Stores next char in key
     
@@ -67,7 +65,7 @@ static inline unsigned long hash(const char *str) {
 
 
 // Initialize empty hashmap
-static inline void hashMapInit(HashMap *m) {
+void hashMapInit(HashMap *m) {
     // Initialize all buckets to null
     for(int i = 0; i < HM_TABLE_SIZE; i++)
         m->buckets[i] = NULL;
@@ -78,7 +76,7 @@ static inline void hashMapInit(HashMap *m) {
 
 
 // Insert new value or update existing
-static inline void hashMapPut(HashMap *m, const char *key, int value) {
+void hashMapPut(HashMap *m, const char *key, int value) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
@@ -104,7 +102,7 @@ static inline void hashMapPut(HashMap *m, const char *key, int value) {
 }
 
 
-static inline char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*)) {
+char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const char*, int*)) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
@@ -123,7 +121,7 @@ static inline char hashMapUpdate(HashMap *m, const char *key, void (*fn)(const c
 
 
 // Retrieve value associated with key in hashmap
-static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
+int hashMapGet(HashMap *m, const char *key, int *outValue) {
     unsigned long h = hash(key) % HM_TABLE_SIZE;
     HashMapEntry *e = m->buckets[h];
 
@@ -141,7 +139,7 @@ static inline int hashMapGet(HashMap *m, const char *key, int *outValue) {
 }
 
 
-static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int)) {
+void hashMapMap(HashMap *m, void (*fn)(const char *, int)) {
     // Iterate through used buckets
     for(int i = 0; i < m->usedCount; i++) {
         int bucket = m->usedBuckets[i];
@@ -156,7 +154,7 @@ static inline void hashMapMap(HashMap *m, void (*fn)(const char *, int)) {
 
 
 // Deallocate hashmap memory
-static inline void hashMapFree(HashMap *m) {
+void hashMapFree(HashMap *m) {
     // Iterate through used buckets
     for(int i = 0; i < m->usedCount; i++) {
         int bucket = m->usedBuckets[i];
@@ -173,7 +171,7 @@ static inline void hashMapFree(HashMap *m) {
 
 
 // Initialize hashmap iterator
-static inline void iteratorInit(HashMapIterator *it, HashMap *map) {
+void iteratorInit(HashMapIterator *it, HashMap *map) {
     it->map = map;
     it->bucketIndex = 0;
     it->entry = NULL;
@@ -193,7 +191,7 @@ static inline void iteratorInit(HashMapIterator *it, HashMap *map) {
 
 
 // Advance HashMap iterator and retrieve key/value
-static inline char iteratorNext(HashMapIterator *it, const char **key, int *value) {
+char iteratorNext(HashMapIterator *it, const char **key, int *value) {
     if(!it->entry) { // No more entries
         *key = NULL;
         return 0;
@@ -224,3 +222,4 @@ static inline char iteratorNext(HashMapIterator *it, const char **key, int *valu
 
 
 #endif // HASHMAP_IMPLEMENTATION
+#endif // HASHMAP_H
