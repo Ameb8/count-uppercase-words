@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#include "hashmap.h"
+
 int runManager(FILE* file, int numWorkers, HashMap* resultsMap);
 
 #endif
