@@ -3,3 +3,4 @@ bin/*
 obj/*
 obj_dbg/*
 obj_opt/*
+**/__pycache__
