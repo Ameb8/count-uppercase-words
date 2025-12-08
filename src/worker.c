@@ -110,8 +110,14 @@ int runWorker(FILE* file) {
     SerializedMap titleWords = serializeHashMap(&map);
 
     // Send words to manager
-    MPI_Send(&titleWords.size, 1, MPI_INT, 0, 0, MPI_COMM_WORLD); // Send size
-    MPI_Send(titleWords.data, titleWords.size, MPI_BYTE, 0, 0, MPI_COMM_WORLD); // Send data
+    MPI_Send(&titleWords.size, 1, MPI_INT, 0, TAG_WORDS_SIZE, MPI_COMM_WORLD); // Send size
+
+    #ifdef DBG // DEBUG PRINT
+        printf("\ntitle words with %d bytes sent", titleWords.size);
+        fflush(stdout);
+    #endif
+
+    MPI_Send(titleWords.data, titleWords.size, MPI_BYTE, 0, TAG_WORDS, MPI_COMM_WORLD); // Send data
 
     return SUCCESS_CODE;
 }
