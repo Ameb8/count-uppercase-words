@@ -22,6 +22,29 @@ typedef struct {
 } FileChunk;
 
 
+// Prints program results
+void printResults(HashMap* results) {
+    // Initialize hashmap iterator
+    HashMapIterator it;
+    iteratorInit(&it, results);
+
+    unsigned long long totalWords = 0;
+
+    const char* nextWord;
+    int nextCount;
+
+    // Iterate results map entries
+    while(iteratorNext(&it, &nextWord, &nextCount)) {
+        printf("\n%s: %d", nextWord, nextCount); // Display word/count
+        totalWords += (unsigned long long) nextCount; // Increment total words
+    }
+
+    // Print total words
+    printf("\n\nUnique Title-Cased Words:\t\t%d", results->size);
+    printf("\nTotal Title-Cased Words:\t\t%llu", totalWords);
+}
+
+
 static inline void hashMapMergeSum(HashMap *dst, HashMap *src) {
     // Create iterator for source map
     HashMapIterator it;
@@ -83,9 +106,10 @@ int main(int argc, char* argv[]) {
     MPI_Barrier(MPI_COMM_WORLD); // Wait for processes
     elapsedTime = -MPI_Wtime(); // Start benchmark time
 
+    HashMap titleWords;
+
     if(!procID) { // Run manager process
-        // Create hashmap to store manager's results
-        HashMap titleWords;
+        // Initialize hashmap to store manager's results
         hashMapInit(&titleWords);
 
         runManager(file, numProcs - 1, &titleWords); // Run manager process
@@ -93,6 +117,12 @@ int main(int argc, char* argv[]) {
         runWorker(file);
     }
 
+    elapsedTime += MPI_Wtime();
+
+    if(!procID) {
+        printResults(&titleWords);
+        printf("\nBenchmark Time (%d):\t\t%10.6f\n", numProcs, elapsedTime);
+    }
 
     // Exit program gracefully
     MPI_Finalize();

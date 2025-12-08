@@ -54,7 +54,8 @@ static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
 
 
 static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
-    if (dataSize < sizeof(int)) return; // empty buffer
+    if(dataSize < sizeof(int)) // Check for empty buffer 
+        return;
 
     int bytesRead = 0;
 
@@ -64,15 +65,15 @@ static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
     data += sizeof(int);
     bytesRead += sizeof(int);
 
-    for (int i = 0; i < entryCount; i++) {
-        if (bytesRead + sizeof(int) > dataSize) break; // sanity check
+    for(int i = 0; i < entryCount; i++) {
+        if(bytesRead + sizeof(int) > dataSize) break; // sanity check
 
         int wordLen;
         memcpy(&wordLen, data, sizeof(int));
         data += sizeof(int);
         bytesRead += sizeof(int);
 
-        if (bytesRead + wordLen + sizeof(int) > dataSize) break; // sanity check
+        if(bytesRead + wordLen + sizeof(int) > dataSize) break; // sanity check
 
         const char* nextWord = data;
         data += wordLen; // move past the key
@@ -85,7 +86,7 @@ static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
 
         mergingCount = value; // store value for mergeUpdate
 
-        if (!hashMapUpdate(map, nextWord, mergeUpdate))
+        if(!hashMapUpdate(map, nextWord, mergeUpdate))
             hashMapPut(map, nextWord, mergingCount);
     }
 }
@@ -103,29 +104,6 @@ static inline long long getFileSize(FILE* file) {
         return -1;
     
     return size;
-}
-
-
-// Prints program results
-void printResults(HashMap* results) {
-    // Initialize hashmap iterator
-    HashMapIterator it;
-    iteratorInit(&it, results);
-
-    unsigned long long totalWords = 0;
-
-    const char* nextWord;
-    int nextCount;
-
-    // Iterate results map entries
-    while(iteratorNext(&it, &nextWord, &nextCount)) {
-        printf("\n%s: %d", nextWord, nextCount); // Display word/count
-        totalWords += (unsigned long long) nextCount; // Increment total words
-    }
-
-    // Print total words
-    printf("\n\nUnique Title-Cased Words:\t\t%d", results->size);
-    printf("\nTotal Title-Cased Words:\t\t%llu", totalWords);
 }
 
 
@@ -226,9 +204,6 @@ int runManager(FILE* file, int numWorkers, HashMap* resultsMap) {
     // Free allocated memory
     free(workerResults);
     free(resultSizes);
-
-    // Output results
-    printResults(resultsMap);
 
     return 0;
 }
