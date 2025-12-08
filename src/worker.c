@@ -28,7 +28,7 @@ static inline SerializedMap serializeHashMap(HashMap* map) {
 
     // Count total data size in map
     while(iteratorNext(&it, &key, &value)) {
-        int wordLen = strlen(key); // Get length of entry's key
+        int wordLen = strlen(key) + 1; // Get length of entry's key
         totalSize += sizeof(int) + wordLen + sizeof(int); // Compute size of entry
     }
 
@@ -44,7 +44,7 @@ static inline SerializedMap serializeHashMap(HashMap* map) {
     
     // Write serialized data
     while(iteratorNext(&it, &key, &value)) {
-        int wordLen = strlen(key); // Get length of next key
+        int wordLen = strlen(key) + 1; // Get length of next key
 
         // Copy length of next word into buffer
         memcpy(curByte, &wordLen, sizeof(int)); // Copy data

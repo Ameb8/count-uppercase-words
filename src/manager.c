@@ -14,9 +14,22 @@ static void mergeUpdate(const char* word, int* count) {
     *count += mergingCount;
 }
 
-
+/*
 static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
+    if(dataSize < sizeof(int)) { // Ensure data contains title words
+        #ifdef DBG // DEBUG PRINT
+            printf("\nNo data to aggregate (%d)", dataSize);
+            fflush(stdout);
+        #endif
+        
+        return;
+    }
+    
     int bytesRead = 0;
+
+    // Ignore entry count
+    bytesRead += sizeof(int);
+    data += sizeof(int);
 
     while(bytesRead < dataSize) {
         // Get length of next word
@@ -30,9 +43,49 @@ static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
         data += wordLen; // Increment data pointer to word's count
         bytesRead += wordLen; // Increment bytes read
         memcpy(&mergingCount, data, sizeof(int)); // Read word count
+        bytesRead += sizeof(int);
 
         // Merge word into hashmap
         if(!hashMapUpdate(map, nextWord, mergeUpdate))
+            hashMapPut(map, nextWord, mergingCount);
+    }
+}
+*/
+
+
+static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
+    if (dataSize < sizeof(int)) return; // empty buffer
+
+    int bytesRead = 0;
+
+    // Read entry count
+    int entryCount;
+    memcpy(&entryCount, data, sizeof(int));
+    data += sizeof(int);
+    bytesRead += sizeof(int);
+
+    for (int i = 0; i < entryCount; i++) {
+        if (bytesRead + sizeof(int) > dataSize) break; // sanity check
+
+        int wordLen;
+        memcpy(&wordLen, data, sizeof(int));
+        data += sizeof(int);
+        bytesRead += sizeof(int);
+
+        if (bytesRead + wordLen + sizeof(int) > dataSize) break; // sanity check
+
+        const char* nextWord = data;
+        data += wordLen; // move past the key
+        bytesRead += wordLen;
+
+        int value;
+        memcpy(&value, data, sizeof(int)); // read value here
+        data += sizeof(int); // then move pointer
+        bytesRead += sizeof(int);
+
+        mergingCount = value; // store value for mergeUpdate
+
+        if (!hashMapUpdate(map, nextWord, mergeUpdate))
             hashMapPut(map, nextWord, mergingCount);
     }
 }
@@ -165,9 +218,15 @@ int runManager(FILE* file, int numWorkers, HashMap* resultsMap) {
         fflush(stdout);
     #endif
 
-    for(int i = 0; i < numWorkers; i++) // Add words to hashmap
+    for(int i = 0; i < numWorkers; i++) { // Add words to hashmap
         mergeToMap(resultsMap, workerResults[i], resultSizes[i]);
-    
+        free(workerResults[i]);
+    }
+ 
+    // Free allocated memory
+    free(workerResults);
+    free(resultSizes);
+
     // Output results
     printResults(resultsMap);
 
