@@ -5,10 +5,10 @@
 target=./bin/count
 
 # Set target for alternate build
-if [ -n "$2" ]; then
-    target=./bin/count_$2
+if [ -n "$3" ]; then
+    target=./bin/count_$3
 fi
 
 
-make $2 # Recompile if necessary
-mpirun -np $1 -oversubscribe $target test_files/big.txt # Run program
+make $3 > /dev/null # Recompile if necessary
+mpirun -np $1 -oversubscribe $target $2 # Run program

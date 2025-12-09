@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 from pathlib import Path
-from math import ceil
 import subprocess
 import argparse
 import statistics
+from datetime import datetime
 from typing import Optional
-
 import matplotlib.pyplot as plt
 
 
@@ -18,25 +17,35 @@ EXEC_VERSION: str = "opt"
 MIN_PROCS: int = 2 # Inclusive
 MAX_PROCS: int = 11 # Exclusive
 
-NUM_RUNS = 10
-
-# Path to compilation target directory
-BIN_DIR: Path = Path(__file__).parent.parent / "bin"
+NUM_RUNS: int = 10 # Number of runs used to average benchmark
 
 # Path to directory to store benchmark plots
 PLOT_DIR: Path = Path(__file__).parent.parent / "plots"
 
 
 def run_benchmark(num_processes: int, file_name: str) -> float:
+    exec_cmd: list[str] = [str(EXEC_PATH), str(num_processes), file_name, EXEC_VERSION]
+
     # Execute program as subprocess
     result = subprocess.run(
-        [str(EXEC_PATH), file_name, num_processes, EXEC_VERSION],
+        exec_cmd,
         capture_output=True,
         text=True
     )
 
+    # DEBUG ******
+    print(f"last Token stdout: {result.stdout.split(' ')[-1]}")
+    # Take last word in stdout as wall-clock benchmark time
+    wall_time: float = float(result.stdout.strip().split(' ')[-1])
+
+    print(f"Executing with {' '.join(exec_cmd)}:\t\tResult: {wall_time}")
+
+    if result.stderr:
+        print("Error: {result.stderr}")
+    
     # Return last word from program execution stdout as wall-clock benchmark time
-    return float(result.stdout.split(' ')[-1])
+    return wall_time
+
 
 def avg_benchmark(num_procs: int, num_runs: int, file_name: str) -> float:
     """
@@ -44,6 +53,7 @@ def avg_benchmark(num_procs: int, num_runs: int, file_name: str) -> float:
     Average is calculated over num_runs iterations
     """
     return statistics.mean([run_benchmark(num_procs, file_name) for i in range(0, num_runs)])
+
 
 def run_benchmarks(min_procs: int, max_procs: int, num_runs: int, file_name: str) -> list[float]:
     """
@@ -53,49 +63,11 @@ def run_benchmarks(min_procs: int, max_procs: int, num_runs: int, file_name: str
     return [avg_benchmark(p, num_runs, file_name) for p in range(min_procs, max_procs)]
 
 
-def run_bench(src_path: Path, processes: list[int], prgm_args: list[str], mpicc_args) -> tuple[list[float], list[float]]:
-    # Define path to executable target
-    target_path: Path = BIN_DIR / src_path.stem
-
-    # Compile Program
-    if not mpicc_compile(src_path, target_path, mpicc_args):
-        return ([], []) # Compilation failed
-    
-    avg: list[float] = [] # Holds result of each run with p for averaging
-
-    for p in processes: # Return list of benchmark results for each process amount
-        # Benchmark average runtime
-        runtimes: list[float] = [mpicc_benchmark(target_path, p, prgm_args) for _ in range(5)]
-        avg.append(statistics.mean(runtimes)) # Take average of 5 runs
-
-    return (avg, basic_pred_runtime(processes, avg[0]))
-
-
-def plot_benchmark(
-    processes: list[int], 
-    exec_times: list[float], 
-    prgm_name: str, 
-    theoretical_times: Optional[list[float]] = None
-) -> None:
-    plot_path: Path = PLOT_DIR / f'{prgm_name}_benchmark_results.png'
-    plt.plot(processes, exec_times, marker='o', label='Measured Runtime')
-
-    if theoretical_times:
-        plt.plot(processes, theoretical_times, marker='x', label='Theoretical Runtime')
-
-    plt.xlabel('Average Execution Time (s)')
-    plt.ylabel('Number of Processes')
-
-    plt.title(f'MPI Benchmark of {prgm_name}')
-    plt.grid(True)
-    plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-
-
 def plot_benchmark_multi(results: dict, processes: list[int]):
     plt.figure()
 
     for input_file, exec_times in results.items():
-        plt.plot(processes, exec_times, marker='o', label=f'{input_file}')
+        plt.plot(processes, exec_times, marker='o', label=input_file.split('/')[-1])
 
     plt.xlabel('Number of Processes')
     plt.ylabel('Average Execution Time (s)')
@@ -103,7 +75,8 @@ def plot_benchmark_multi(results: dict, processes: list[int]):
     plt.grid(True)
     plt.legend()
 
-    plot_path = PLOT_DIR / "combined_benchmark_results.png"
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    plot_path = PLOT_DIR / f'benchmark_results_{timestamp}.png'
     plt.savefig(plot_path, dpi=300, bbox_inches='tight')
     print(f"Saved plot to {plot_path}")
 
@@ -122,7 +95,8 @@ def main():
     )
 
     parser.add_argument( # Flags for program execution
-        '-rs', '--read-size' 
+        '-rs', 
+        '--read-size',
         nargs=1, 
         help='Size of chunks file is read in (Bytes)'
     )
@@ -133,7 +107,7 @@ def main():
 
 
     # Run benchmarks
-    benchmark_results: list[list[float]] = [run_benchmarks(MIN_PROCS, MAX_PROCS, NUM_RUNS, file) for file in args.input_files]
+    # benchmark_results: list[list[float]] = [run_benchmarks(MIN_PROCS, MAX_PROCS, NUM_RUNS, file) for file in args.input_files]
     
     results: dict[str, list[float]] = {}
 
