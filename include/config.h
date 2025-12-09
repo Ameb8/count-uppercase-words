@@ -6,7 +6,7 @@
 #define SUCCESS_CODE 0
 
 // Read chunk and max word sizes
-#define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 4 MB chunks
+#define MAX_CHUNK_SIZE (4 * 4 * 1024) // Read file in 16 KB chunks
 #define MAX_WORD_LEN 128
 
 // MPI message tags
@@ -18,3 +18,4 @@
 #define TAG_READY 6
 
 #endif
+#define MAX_CHUNK_SIZE 16384

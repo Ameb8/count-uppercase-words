@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import subprocess
+import sys
+import re
 import argparse
 import statistics
 from datetime import datetime
@@ -17,10 +19,36 @@ EXEC_VERSION: str = "opt"
 MIN_PROCS: int = 2 # Inclusive
 MAX_PROCS: int = 12 # Exclusive
 
+MIN_KBC = 1
+MAX_KBC = 16
+
 NUM_RUNS: int = 10 # Number of runs used to average benchmark
 
 # Path to directory to store benchmark plots
 PLOT_DIR: Path = Path(__file__).parent.parent / "plots"
+
+def set_read_size(new_value: int):
+    script_dir: Path = Path(__file__).resolve().parent
+    config_path: Path = (script_dir / "../include/config.h").resolve()
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    text = config_path.read_text()
+
+    # Convert KB → Bytes
+    byte_value = new_value * 1024
+
+    pattern = r"(#define\s+MAX_CHUNK_SIZE\s+)(\d+)"
+    replacement = rf"\g<1>{byte_value}"
+
+    if re.search(pattern, text):
+        new_text = re.sub(pattern, replacement, text)
+    else:
+        new_text = text.rstrip() + f"\n#define MAX_CHUNK_SIZE {byte_value}\n"
+
+    config_path.write_text(new_text)
+    print(f"Updated MAX_CHUNK_SIZE to {byte_value} bytes (from {new_value} KB) in {config_path}")
 
 
 def run_benchmark(num_processes: int, file_name: str) -> float:
@@ -75,6 +103,7 @@ def run_benchmarks(min_procs: int, max_procs: int, num_runs: int, file_name: str
     return [avg_benchmark(p, num_runs, file_name) for p in range(min_procs, max_procs)]
 
 
+
 def plot_benchmark_multi(results: dict, processes: list[int]):
     plt.figure()
 
@@ -122,9 +151,11 @@ def main():
     # benchmark_results: list[list[float]] = [run_benchmarks(MIN_PROCS, MAX_PROCS, NUM_RUNS, file) for file in args.input_files]
     
     results: dict[str, list[float]] = {}
+    read_sizes_kb: list[int] = [256, 128, 64, 32, 16]
 
-    for file in args.input_files: # Populate map with benchmark results
-        results[file] = run_benchmarks(MIN_PROCS, MAX_PROCS, NUM_RUNS, file)
+    for size in read_sizes_kb: # Populate map with benchmark results
+        set_read_size(size);
+        results[f"{size} KB"] = run_benchmarks(MIN_PROCS, MAX_PROCS, NUM_RUNS, args.input_files[0])
 
     # Create plot
     plot_benchmark_multi(results, range(MIN_PROCS, MAX_PROCS))

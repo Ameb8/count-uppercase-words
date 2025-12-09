@@ -10,7 +10,7 @@ OBJ_DIR_OPT  = obj_opt
 # Compiler flags
 CFLAGS       = -Wall -Wextra -O2 $(INCLUDES)
 CFLAGS_DBG   = -Wall -Wextra -g -DDBG $(INCLUDES)
-CFLAGS_OPT   = -Wall -Wextra -march=native -funroll-loops -flto $(INCLUDES)
+CFLAGS_OPT   = -Wall -Wextra -O3 -march=native -funroll-loops -flto $(INCLUDES)
 
 # Binaries
 BIN       = bin/count

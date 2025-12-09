@@ -14,44 +14,6 @@ static void mergeUpdate(const char* word, int* count) {
     *count += mergingCount;
 }
 
-/*
-static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
-    if(dataSize < sizeof(int)) { // Ensure data contains title words
-        #ifdef DBG // DEBUG PRINT
-            printf("\nNo data to aggregate (%d)", dataSize);
-            fflush(stdout);
-        #endif
-        
-        return;
-    }
-    
-    int bytesRead = 0;
-
-    // Ignore entry count
-    bytesRead += sizeof(int);
-    data += sizeof(int);
-
-    while(bytesRead < dataSize) {
-        // Get length of next word
-        int wordLen; // Length of next word
-        memcpy(&wordLen, data, sizeof(int)); // Read word length
-
-        data += sizeof(int); // Increment data pointer
-        bytesRead += sizeof(int); // Increment bytes read
-
-        const char* nextWord = data; // Store start of next word
-        data += wordLen; // Increment data pointer to word's count
-        bytesRead += wordLen; // Increment bytes read
-        memcpy(&mergingCount, data, sizeof(int)); // Read word count
-        bytesRead += sizeof(int);
-
-        // Merge word into hashmap
-        if(!hashMapUpdate(map, nextWord, mergeUpdate))
-            hashMapPut(map, nextWord, mergingCount);
-    }
-}
-*/
-
 
 static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
     if(dataSize < sizeof(int)) // Check for empty buffer 
@@ -76,12 +38,12 @@ static inline void mergeToMap(HashMap* map, char* data, int dataSize) {
         if(bytesRead + wordLen + sizeof(int) > dataSize) break; // sanity check
 
         const char* nextWord = data;
-        data += wordLen; // move past the key
+        data += wordLen; // Advance to count
         bytesRead += wordLen;
 
         int value;
-        memcpy(&value, data, sizeof(int)); // read value here
-        data += sizeof(int); // then move pointer
+        memcpy(&value, data, sizeof(int)); // Read word count
+        data += sizeof(int); // Advance pointer
         bytesRead += sizeof(int);
 
         mergingCount = value; // store value for mergeUpdate

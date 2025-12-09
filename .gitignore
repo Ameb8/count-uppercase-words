@@ -12,3 +12,7 @@ obj_opt/*
 # Python files
 **/__pycache__
 .venv/
+
+test_files/WebstersDictionary_x30.txt
+
+plots/*.png
